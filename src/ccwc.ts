@@ -1,25 +1,47 @@
 import fs = require('node:fs');
 
-export const readText = (fileName: any) => {
-    try {
-        return fs.readFileSync(fileName, 'utf-8')
-    } catch (err: any) {
-        return process.stderr.write(err.message)
+export const readText = (fileName: string | undefined): string => {
+    if (typeof fileName !== 'undefined') {
+        try {
+            return fs.readFileSync(fileName, 'utf-8')
+        } catch {
+            throw new Error("There was a problem reading the file")
+        }
+    } else {
+        throw new Error("No file")
     }
 }
 
-export const bytesCount = (str: any) => new Blob([str]).size;
+export const readStdIn = () => {
+    let input = ''
+    process.stdin.setEncoding('utf-8')
 
-export const newLinesCount = (str: any) => [...str.matchAll(/\n/g)].length;
+    return new Promise<string>((resolve) => {
+        process.stdin.on('readable', () => {
+            const chunk = process.stdin.read()
+            if (chunk !== null) {
+                input += chunk
+            }
+        })
 
-export const charactersCount = (str: any) => str.length
+        process.stdin.on('end', () => {
+            resolve(input)
+        })
+    })
+}
 
-export const wordsCount = (str: any) => {
+export const bytesCount = (str: string) => Buffer.byteLength(str, 'utf-8')
+
+export const newLinesCount = (str: string) => [...str.matchAll(/\n/g)].length;
+
+export const charactersCount = (str: string) => str.length
+
+export const wordsCount = (str: string) => {
     const words = str.match(/\S+/g)
     return words ? words.length : 0;
 }
 
-const parseFlags = (args: any, str: string) => {
+const parseFlags = (args: string[], str: string) => {
     switch (true) {
         case args.indexOf('-c') > -1:
             return bytesCount(str)
@@ -34,21 +56,38 @@ const parseFlags = (args: any, str: string) => {
     }
 }
 
-
 export const main = (args: string[]) => {
+    const flags = ['-c', '-l', '-w', '-m']
     const argsLength = args.length
-    let str = ''
 
-    // TODO process.stdin if exists will be the string
-    if (argsLength > 2) str += readText(args[argsLength - 1])
-    if (argsLength > 4) return "Too many arguments"
+    try {
+        let filename = ''
+        let str = ''
 
+        if (argsLength > 4) throw new Error("Too many arguments")
 
-    const results = parseFlags(args, str)
+        if (argsLength > 3) {
+            filename = args.at(-1) ?? ''
+            str += readText(args.at(-1))
+        }
 
-    return typeof results === 'object'
-        ? `${results.join(' ')} ${args[argsLength - 1]}`
-        : `${results} ${args[argsLength - 1]}`
+        if (argsLength <= 3) {
+            if (flags.indexOf(String(args.at(-1))) != -1) {
+                str += readStdIn()
+            } else {
+                str += readText(args.at(-1))
+            }
+        }
+
+        const results = parseFlags(args, str)
+
+        return Array.isArray(results)
+            ? `${results.join(' ')} ${args.at(-1)}`
+            : `${results} ${filename}`
+    } catch (error: any) {
+        return (error.message)
+    }
 }
 
-process.stdout.write(main(process.argv));
+const result = main(process.argv);
+process.stdout.write(`${result}\n`)

@@ -1,4 +1,4 @@
-import { readText, bytesCount, newLinesCount, wordsCount, charactersCount, main } from "../src/ccwc";
+import {readText, bytesCount, newLinesCount, wordsCount, charactersCount, main, readStdIn} from "../src/ccwc";
 
 const testFile = readText('./test.txt')
 
@@ -57,10 +57,21 @@ describe('ccwc tests', () => {
         })
     })
 
+    describe('stdin', () => {
+        it('stdin test', () => {
+            expect(readStdIn()).toBe('test')
+        })
+    })
+
     describe('errors', () => {
         it('too many arguments', () => {
-            const result = main(['node', 'src/ccwc.ts', '-l', 'test.txt', 'extra'])
-            expect(result).toBe('Too many arguments')
+            const result = main(['node', 'src/ccwc.ts', '-l', "test.txt", 'extra'])
+            expect(result).toBe("Too many arguments")
+        })
+
+        it('Test non existent file', () => {
+            const result = main(['node', 'src/ccwc.ts', '-l', 'tes']);
+            expect(result).toBe('There was a problem reading the file')
         })
     })
 })
