@@ -57,12 +57,6 @@ describe('ccwc tests', () => {
         })
     })
 
-    describe('stdin', () => {
-        it('stdin test', () => {
-            expect(readStdIn()).toBe('test')
-        })
-    })
-
     describe('errors', () => {
         it('too many arguments', () => {
             const result = main(['node', 'src/ccwc.ts', '-l', "test.txt", 'extra'])

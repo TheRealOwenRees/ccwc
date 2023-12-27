@@ -1,9 +1,9 @@
-import fs = require('node:fs');
+import fs from "node:fs/promises";
 
-export const readText = (fileName: string | undefined): string => {
+export const readText = async (fileName: string | undefined): Promise<string> => {
     if (typeof fileName !== 'undefined') {
         try {
-            return fs.readFileSync(fileName, 'utf-8')
+            return await fs.readFile(fileName, {encoding: 'utf-8'})
         } catch {
             throw new Error("There was a problem reading the file")
         }
@@ -12,23 +12,17 @@ export const readText = (fileName: string | undefined): string => {
     }
 }
 
-export const readStdIn = () => {
+export const readStdIn = async () => {
     let input = ''
+
     process.stdin.setEncoding('utf-8')
 
-    return new Promise<string>((resolve) => {
-        process.stdin.on('readable', () => {
-            const chunk = process.stdin.read()
-            if (chunk !== null) {
-                input += chunk
-            }
-        })
+    for await (const chunk of process.stdin) {
+        input += chunk
+    }
 
-        process.stdin.on('end', () => {
-            resolve(input)
-        })
-    })
-}
+    return input
+};
 
 export const bytesCount = (str: string) => Buffer.byteLength(str, 'utf-8')
 
@@ -56,38 +50,45 @@ const parseFlags = (args: string[], str: string) => {
     }
 }
 
-export const main = (args: string[]) => {
-    const flags = ['-c', '-l', '-w', '-m']
+export const main = async (args: string[]) => {
     const argsLength = args.length
 
     try {
+        const filenameRegex = /[^\-].*\.(txt|js|ts)$/
         let filename = ''
         let str = ''
+        let isPiped = false
 
-        if (argsLength > 4) throw new Error("Too many arguments")
-
-        if (argsLength > 3) {
-            filename = args.at(-1) ?? ''
-            str += readText(args.at(-1))
-        }
-
-        if (argsLength <= 3) {
-            if (flags.indexOf(String(args.at(-1))) != -1) {
-                str += readStdIn()
-            } else {
-                str += readText(args.at(-1))
+        if (!process.stdin.isTTY) {
+            str += await readStdIn()
+            isPiped = true
+        } else {
+            switch (true) {
+                case argsLength > 4:
+                    throw new Error("Too many arguments")
+                case argsLength === 3 || argsLength === 4:
+                    if (filenameRegex.test(args[2]) && !args[2].startsWith('-')) {
+                        filename = args[2]
+                    } else if (argsLength === 4 && filenameRegex.test(args[3]) && !args[3].startsWith('-')) {
+                        filename = args[3]
+                    }
+                    if (filename) {
+                        str += await readText(filename)
+                    }
+                    break
+                default:
+                    throw new Error("An error occurred, likely not enough arguments or invalid flags provided")
             }
         }
 
         const results = parseFlags(args, str)
 
         return Array.isArray(results)
-            ? `${results.join(' ')} ${args.at(-1)}`
+            ? `${results.join(' ')} ${isPiped ? '' : args.at(-1)}`
             : `${results} ${filename}`
     } catch (error: any) {
         return (error.message)
     }
 }
 
-const result = main(process.argv);
-process.stdout.write(`${result}\n`)
+process.stdout.write(`${await main(process.argv)}\n`)
